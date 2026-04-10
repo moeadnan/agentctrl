@@ -27,7 +27,9 @@ except ImportError:
 
 logger = logging.getLogger("agentctrl.authority")
 
-SEED_GRAPH = {
+EMPTY_GRAPH: dict = {"nodes": [], "edges": [], "separation_of_duty": []}
+
+FINANCE_SEED_GRAPH = {
     "nodes": [
         {"id": "finance_director", "label": "Finance Director", "type": "role",
          "financial_limit": None, "action_scopes": ["*"]},
@@ -68,6 +70,8 @@ SEED_GRAPH = {
     ],
 }
 
+SEED_GRAPH = FINANCE_SEED_GRAPH
+
 DIMENSION_PARAM_MAP = {
     "data_classification_access": "classification",
     "environment_scope": "environment",
@@ -84,8 +88,8 @@ class AuthorityGraphEngine:
     """
 
     def __init__(self, graph_data: dict | None = None):
-        self.graph_data = graph_data or SEED_GRAPH
-        if HAS_NETWORKX:
+        self.graph_data = graph_data if graph_data is not None else EMPTY_GRAPH
+        if HAS_NETWORKX and self.graph_data.get("nodes"):
             self._build_graph()
 
     @classmethod
@@ -118,6 +122,13 @@ class AuthorityGraphEngine:
                                 valid_until=edge.get("valid_until"))
 
     async def resolve(self, proposal) -> PipelineStageResult:
+        if not self.graph_data.get("nodes"):
+            return PipelineStageResult(
+                "authority_resolution", "PASS",
+                {"note": "No authority graph configured."},
+                "No authority graph configured — authority check passed.",
+            )
+
         agent_node = self._find_agent_node(proposal.agent_id)
         if not agent_node:
             return PipelineStageResult(

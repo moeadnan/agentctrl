@@ -24,8 +24,6 @@ from .types import PipelineStageResult
 
 logger = logging.getLogger("agentctrl.conflict")
 
-_ACTIVE_WORKFLOWS: dict[str, dict] = {}
-
 
 class ConflictDetector:
     """Detects conflicts between concurrently executing agent workflows."""
@@ -37,6 +35,9 @@ class ConflictDetector:
         "api.*": [{"resource_type": "api", "param": "api_name"}],
     }
 
+    def __init__(self) -> None:
+        self._active_workflows: dict[str, dict] = {}
+
     def set_resource_mappings(self, mappings: dict[str, list[dict]]) -> None:
         """Allow admin-configured resource type mappings."""
         self.RESOURCE_TYPE_MAPPINGS = {**self.RESOURCE_TYPE_MAPPINGS, **mappings}
@@ -46,7 +47,7 @@ class ConflictDetector:
 
         resource_keys = self._extract_resource_keys(proposal)
         for resource_key in resource_keys:
-            for wf_id, wf_data in _ACTIVE_WORKFLOWS.items():
+            for wf_id, wf_data in self._active_workflows.items():
                 if wf_id == proposal.workflow_id:
                     continue
                 if resource_key in wf_data.get("locked_resources", []):
@@ -103,19 +104,19 @@ class ConflictDetector:
 
         return PipelineStageResult(
             "conflict_detection", "PASS",
-            {"active_workflows": len(_ACTIVE_WORKFLOWS), "conflicts_found": 0},
+            {"active_workflows": len(self._active_workflows), "conflicts_found": 0},
             "No conflicts detected with currently active workflows.",
         )
 
     async def register_workflow(self, workflow_id: str, resources: list[str]) -> None:
-        _ACTIVE_WORKFLOWS[workflow_id] = {
+        self._active_workflows[workflow_id] = {
             "workflow_id": workflow_id,
             "locked_resources": resources,
             "registered_at": datetime.now(timezone.utc).isoformat(),
         }
 
     async def deregister_workflow(self, workflow_id: str) -> None:
-        _ACTIVE_WORKFLOWS.pop(workflow_id, None)
+        self._active_workflows.pop(workflow_id, None)
 
     def _extract_resource_keys(self, proposal) -> list[str]:
         """Extract typed resource keys from proposal using configured mappings."""
@@ -152,7 +153,7 @@ class ConflictDetector:
 
     def _get_committed_amount(self, cost_center: str, exclude_workflow: str | None) -> float:
         total = 0.0
-        for wf_id, wf_data in _ACTIVE_WORKFLOWS.items():
+        for wf_id, wf_data in self._active_workflows.items():
             if wf_id == exclude_workflow:
                 continue
             for lock in wf_data.get("locked_resources", []):

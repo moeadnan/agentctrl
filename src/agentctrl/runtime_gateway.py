@@ -26,7 +26,7 @@ the library works without platform dependencies.  Fail-closed: any
 unhandled exception during pipeline evaluation produces BLOCK.
 """
 
-import dataclasses
+import json
 import logging
 import time
 from datetime import datetime, timezone
@@ -81,6 +81,7 @@ class RuntimeGateway:
         autonomy_scopes: dict[int, list] | None = None,
         risk_engine: RiskEngine | None = None,
         rate_limits: list[dict] | None = None,
+        audit_log: str | None = None,
     ):
         self.policy_engine = policy_engine or PolicyEngine()
         self.authority_engine = authority_engine or AuthorityGraphEngine()
@@ -90,13 +91,20 @@ class RuntimeGateway:
         self._kill_switch_fn = kill_switch_fn
         self._rate_limits = rate_limits or []
         self._rate_buckets: dict[str, list[float]] = {}
+        self._audit_log_path = audit_log
         if autonomy_scopes is not None:
             self._autonomy_scopes = autonomy_scopes
         else:
             self._autonomy_scopes = self.AUTONOMY_LEVEL_ACTIONS
 
-    async def validate(self, proposal: ActionProposal) -> dict:
+    async def validate(self, proposal: ActionProposal) -> RuntimeDecisionRecord:
         """Run the sequential decision pipeline (pre-gate + 5 stages).
+
+        Returns a :class:`RuntimeDecisionRecord` which is subscriptable::
+
+            result = await gateway.validate(proposal)
+            result.decision     # attribute access
+            result["decision"]  # dict-style access
 
         Fail-closed: any unhandled exception during evaluation produces
         a BLOCK decision rather than propagating to the caller.
@@ -106,18 +114,18 @@ class RuntimeGateway:
         except Exception as exc:
             logger.error("Pipeline error for %s (agent=%s): %s",
                          proposal.action_type, proposal.agent_id, exc)
-            return {
-                "proposal_id": proposal.proposal_id,
-                "agent_id": proposal.agent_id,
-                "action_type": proposal.action_type,
-                "decision": "BLOCK",
-                "reason": f"Governance pipeline error — blocked for safety. Error: {str(exc)[:200]}",
-                "risk_score": 0.0,
-                "risk_level": "CRITICAL",
-                "escalated_to": None,
-                "pipeline": [],
-                "decided_at": datetime.now(timezone.utc).isoformat(),
-            }
+            return RuntimeDecisionRecord(
+                proposal_id=proposal.proposal_id,
+                agent_id=proposal.agent_id,
+                action_type=proposal.action_type,
+                action_params=proposal.action_params,
+                pipeline_stages=[],
+                decision="BLOCK",
+                reason=f"Governance pipeline error — blocked for safety. Error: {str(exc)[:200]}",
+                risk_score=0.0,
+                risk_level="CRITICAL",
+                pipeline=[],
+            )
 
     async def _run_pipeline(self, proposal: ActionProposal) -> dict:
         """Internal pipeline execution — exceptions caught by validate()."""
@@ -206,47 +214,37 @@ class RuntimeGateway:
                                        "Level 1 agents require explicit human approval for all actions.")
 
         permitted = self._autonomy_scopes.get(level, [])
+        if not isinstance(permitted, list):
+            permitted = []
 
-        # Conditional scopes: entries can be structured dicts with conditions and trust thresholds
-        if isinstance(permitted, list):
-            for entry in permitted:
-                if isinstance(entry, dict):
-                    matched = self._check_conditional_scope(entry, proposal, action)
-                    if matched is True:
-                        return PipelineStageResult(
-                            "autonomy_check", "PASS",
-                            {"autonomy_level": level, "action": action, "scope_type": "conditional"},
-                            f"Action '{action}' matched conditional autonomy scope.",
-                        )
-                    if matched == "trust_insufficient":
-                        trust_ctx = getattr(proposal, "trust_context", None) or {}
-                        return PipelineStageResult(
-                            "autonomy_check", "ESCALATE",
-                            {"autonomy_level": level, "action": action,
-                             "trust_total": trust_ctx.get("total_actions", 0),
-                             "scope_type": "trust_gated"},
-                            (f"Action '{action}' is trust-gated. Agent has not met the required "
-                             f"trust threshold for autonomous execution."),
-                        )
-                elif isinstance(entry, str):
-                    if entry == "*" or entry == action:
-                        return PipelineStageResult(
-                            "autonomy_check", "PASS",
-                            {"autonomy_level": level, "action": action},
-                            f"Action '{action}' is within pre-approved scope for Level {level} agents.",
-                        )
-
-        if isinstance(permitted, list) and all(isinstance(e, str) for e in permitted):
-            if "*" not in permitted and action not in permitted:
-                return PipelineStageResult("autonomy_check", "ESCALATE",
-                                           {"autonomy_level": level, "action": action, "permitted": permitted},
-                                           f"Action '{action}' is not in pre-approved scope for Level {level} agents.")
-            return PipelineStageResult("autonomy_check", "PASS",
-                                       {"autonomy_level": level, "action": action},
-                                       f"Action '{action}' is within pre-approved scope for Level {level} agents.")
+        for entry in permitted:
+            if isinstance(entry, dict):
+                matched = self._check_conditional_scope(entry, proposal, action)
+                if matched is True:
+                    return PipelineStageResult(
+                        "autonomy_check", "PASS",
+                        {"autonomy_level": level, "action": action, "scope_type": "conditional"},
+                        f"Action '{action}' matched conditional autonomy scope.",
+                    )
+                if matched == "trust_insufficient":
+                    trust_ctx = getattr(proposal, "trust_context", None) or {}
+                    return PipelineStageResult(
+                        "autonomy_check", "ESCALATE",
+                        {"autonomy_level": level, "action": action,
+                         "trust_total": trust_ctx.get("total_actions", 0),
+                         "scope_type": "trust_gated"},
+                        (f"Action '{action}' is trust-gated. Agent has not met the required "
+                         f"trust threshold for autonomous execution."),
+                    )
+            elif isinstance(entry, str) and (entry == "*" or entry == action):
+                return PipelineStageResult(
+                    "autonomy_check", "PASS",
+                    {"autonomy_level": level, "action": action},
+                    f"Action '{action}' is within pre-approved scope for Level {level} agents.",
+                )
 
         return PipelineStageResult("autonomy_check", "ESCALATE",
-                                   {"autonomy_level": level, "action": action},
+                                   {"autonomy_level": level, "action": action, "permitted": permitted},
                                    f"Action '{action}' is not in pre-approved scope for Level {level} agents.")
 
     def _check_conditional_scope(self, scope_entry: dict, proposal: ActionProposal, action: str):
@@ -388,32 +386,28 @@ class RuntimeGateway:
             reason=reason,
             risk_score=risk_score,
             risk_level=risk_level,
+            pipeline=pipeline_dict,
             escalated_to=escalated_to,
             decided_at=datetime.now(timezone.utc),
+            consequence_class=getattr(proposal, "consequence_class", None),
+            evidence=getattr(proposal, "evidence", None),
+            input_confidence=getattr(proposal, "input_confidence", None),
+            rate_pressure=proposal.context.get("rate_pressure"),
         )
 
-        result = dataclasses.asdict(record)
-        result["pipeline"] = pipeline_dict
-        result["decided_at"] = record.decided_at.isoformat()
+        audit_dict = record.to_dict()
 
-        # Preserve cross-cutting signals in decision record
-        consequence_class = getattr(proposal, "consequence_class", None)
-        if consequence_class:
-            result["consequence_class"] = consequence_class
-        evidence = getattr(proposal, "evidence", None)
-        if evidence:
-            result["evidence"] = evidence
-        input_confidence = getattr(proposal, "input_confidence", None)
-        if input_confidence is not None:
-            result["input_confidence"] = input_confidence
-        rate_pressure = proposal.context.get("rate_pressure")
-        if rate_pressure is not None:
-            result["rate_pressure"] = rate_pressure
+        if self._audit_log_path:
+            try:
+                with open(self._audit_log_path, "a") as f:
+                    f.write(json.dumps(audit_dict, default=str) + "\n")
+            except Exception:
+                logger.warning("Failed to write audit log to %s", self._audit_log_path)
 
         if self.hooks and self.hooks.on_audit:
             try:
-                self.hooks.on_audit(result)
+                self.hooks.on_audit(audit_dict)
             except Exception:
                 pass
 
-        return result
+        return record

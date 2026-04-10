@@ -14,9 +14,10 @@
 
 """agentctrl — Shared data types for the governance pipeline."""
 
+import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable, Awaitable
+from typing import Any, Callable, Awaitable
 from uuid import uuid4
 
 
@@ -78,7 +79,11 @@ class EscalationTarget:
 
 @dataclass
 class RuntimeDecisionRecord:
-    """Complete decision record produced by the pipeline."""
+    """Complete decision record produced by the pipeline.
+
+    Subscriptable for backward compatibility: both ``result.decision``
+    and ``result["decision"]`` work.
+    """
     proposal_id: str
     agent_id: str
     action_type: str
@@ -88,5 +93,27 @@ class RuntimeDecisionRecord:
     reason: str
     risk_score: float
     risk_level: str
+    pipeline: list[dict] = field(default_factory=list)
     escalated_to: "EscalationTarget | str | None" = None
     decided_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Extra fields populated by the gateway for cross-cutting signals
+    consequence_class: str | None = None
+    evidence: dict | None = None
+    input_confidence: float | None = None
+    rate_pressure: float | None = None
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def to_dict(self) -> dict:
+        result = dataclasses.asdict(self)
+        if isinstance(result.get("decided_at"), datetime):
+            result["decided_at"] = result["decided_at"].isoformat()
+        return result

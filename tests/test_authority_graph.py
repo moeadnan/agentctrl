@@ -22,9 +22,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 @pytest.mark.asyncio
 async def test_sod_initiator_ne_approver():
-    from agentctrl import AuthorityGraphEngine, ActionProposal
+    from agentctrl import AuthorityGraphEngine, ActionProposal, FINANCE_SEED_GRAPH
 
-    engine = AuthorityGraphEngine()
+    engine = AuthorityGraphEngine(graph_data=FINANCE_SEED_GRAPH)
     proposal = ActionProposal(
         agent_id="treasury_agent",
         action_type="wire_transfer.execute",
@@ -39,9 +39,9 @@ async def test_sod_initiator_ne_approver():
 
 @pytest.mark.asyncio
 async def test_sod_po_creator_ne_payment_approver():
-    from agentctrl import AuthorityGraphEngine, ActionProposal
+    from agentctrl import AuthorityGraphEngine, ActionProposal, FINANCE_SEED_GRAPH
 
-    engine = AuthorityGraphEngine()
+    engine = AuthorityGraphEngine(graph_data=FINANCE_SEED_GRAPH)
     proposal = ActionProposal(
         agent_id="invoice_agent",
         action_type="invoice.approve",
@@ -56,9 +56,9 @@ async def test_sod_po_creator_ne_payment_approver():
 
 @pytest.mark.asyncio
 async def test_financial_limit_exceeded():
-    from agentctrl import AuthorityGraphEngine, ActionProposal
+    from agentctrl import AuthorityGraphEngine, ActionProposal, FINANCE_SEED_GRAPH
 
-    engine = AuthorityGraphEngine()
+    engine = AuthorityGraphEngine(graph_data=FINANCE_SEED_GRAPH)
     proposal = ActionProposal(
         agent_id="ap_analyst",
         action_type="invoice.approve",
@@ -73,9 +73,9 @@ async def test_financial_limit_exceeded():
 
 @pytest.mark.asyncio
 async def test_action_scope_not_permitted():
-    from agentctrl import AuthorityGraphEngine, ActionProposal
+    from agentctrl import AuthorityGraphEngine, ActionProposal, FINANCE_SEED_GRAPH
 
-    engine = AuthorityGraphEngine()
+    engine = AuthorityGraphEngine(graph_data=FINANCE_SEED_GRAPH)
     proposal = ActionProposal(
         agent_id="ap_analyst",
         action_type="wire_transfer.execute",
@@ -89,9 +89,9 @@ async def test_action_scope_not_permitted():
 
 @pytest.mark.asyncio
 async def test_unknown_agent_escalates():
-    from agentctrl import AuthorityGraphEngine, ActionProposal
+    from agentctrl import AuthorityGraphEngine, ActionProposal, FINANCE_SEED_GRAPH
 
-    engine = AuthorityGraphEngine()
+    engine = AuthorityGraphEngine(graph_data=FINANCE_SEED_GRAPH)
     proposal = ActionProposal(
         agent_id="nonexistent_agent_xyz",
         action_type="invoice.approve",
@@ -106,9 +106,9 @@ async def test_unknown_agent_escalates():
 @pytest.mark.asyncio
 async def test_bfs_authority_chain():
     pytest.importorskip("networkx")
-    from agentctrl import AuthorityGraphEngine, ActionProposal
+    from agentctrl import AuthorityGraphEngine, ActionProposal, FINANCE_SEED_GRAPH
 
-    engine = AuthorityGraphEngine()
+    engine = AuthorityGraphEngine(graph_data=FINANCE_SEED_GRAPH)
     proposal = ActionProposal(
         agent_id="ap_analyst",
         action_type="invoice.approve",

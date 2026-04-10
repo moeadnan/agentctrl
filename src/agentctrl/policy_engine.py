@@ -124,7 +124,62 @@ class PolicyEngine:
 
     def __init__(self, policies: list[dict] | None = None):
         raw = policies if policies is not None else BUILTIN_POLICIES
-        self.policies = sorted(raw, key=lambda p: p.get("priority", 100))
+        self.policies = sorted(
+            [self._normalize_policy(p) for p in raw],
+            key=lambda p: p.get("priority", 100),
+        )
+
+    @staticmethod
+    def _normalize_policy(policy: dict) -> dict:
+        """Deep-copy a policy and normalize each rule to canonical format.
+
+        Canonical rule format::
+
+            {
+                "action_type": "invoice.approve",
+                "conditions": [{"param": "amount", "op": "gt", "value": 5000}],
+                "condition_logic": "AND",
+                "action": "ESCALATE",
+                ...
+            }
+
+        Accepts three input formats:
+          1. ``condition`` key (single dict) — unwrapped into ``conditions`` list
+          2. ``conditions`` key (list) — kept as-is
+          3. Legacy flat keys (``param``, ``op``, ``value`` at rule level)
+        """
+        policy = dict(policy)
+        normalized_rules = []
+        for rule in policy.get("rules", []):
+            rule = dict(rule)
+            if "condition" in rule:
+                cond = rule.pop("condition")
+                rule.setdefault("action_type", cond.get("action_type", "*"))
+                rule.setdefault("temporal", cond.get("temporal"))
+                rule.setdefault("reason", cond.get("reason", rule.get("reason", "")))
+                rule["conditions"] = [{
+                    k: v for k, v in cond.items()
+                    if k not in ("action_type", "temporal", "reason")
+                }]
+                rule["condition_logic"] = "AND"
+                rule["_single"] = True
+            elif "conditions" not in rule:
+                at = rule.pop("action_type", "*")
+                param = rule.pop("param", rule.pop("parameter", ""))
+                op = rule.pop("op", rule.pop("operator", "eq"))
+                value = rule.pop("value", None)
+                rule.setdefault("action_type", at)
+                if "decision" in rule and "action" not in rule:
+                    rule["action"] = rule["decision"]
+                rule["conditions"] = [{"param": param, "op": op, "value": value}]
+                rule["condition_logic"] = "AND"
+                rule["_single"] = True
+            else:
+                rule.setdefault("action_type", "*")
+                rule.setdefault("condition_logic", "AND")
+            normalized_rules.append(rule)
+        policy["rules"] = normalized_rules
+        return policy
 
     @classmethod
     def from_file(cls, path: str) -> "PolicyEngine":
@@ -146,127 +201,79 @@ class PolicyEngine:
         return cls(policies=data)
 
     async def validate(self, proposal) -> PipelineStageResult:
-        matched_rules = []
+        matched_rules: list[dict] = []
         final_action = "PASS"
         final_reason = "No policy rules matched. Action proceeds."
         final_target = None
 
         for policy in self.policies:
             for rule in policy.get("rules", []):
-                if "condition" in rule:
-                    cond = rule["condition"]
-                elif "conditions" in rule:
-                    cond = None  # AND/OR group at rule level
-                else:
-                    cond = {
-                        "action_type": rule.get("action_type", "*"),
-                        "param": rule.get("param") or rule.get("parameter", ""),
-                        "op": rule.get("op") or rule.get("operator", "eq"),
-                        "value": rule.get("value"),
-                        "reason": rule.get("reason", ""),
-                    }
-                    if "action" not in rule and "decision" in rule:
-                        rule = dict(rule, action=rule["decision"])
-
-                # Determine action_type filter
-                if cond is not None:
-                    action_type_filter = cond.get("action_type", rule.get("action_type", "*"))
-                else:
-                    action_type_filter = rule.get("action_type", "*")
-
-                if not self._action_type_matches(action_type_filter, proposal.action_type):
+                if not self._action_type_matches(rule.get("action_type", "*"), proposal.action_type):
                     continue
 
-                # Check temporal condition if present
-                temporal = rule.get("temporal") or (cond.get("temporal") if cond else None)
+                temporal = rule.get("temporal")
                 if temporal and not self._evaluate_temporal(temporal, proposal):
                     continue
 
-                # AND/OR condition groups
-                if "conditions" in rule:
-                    logic = rule.get("condition_logic", "AND")
-                    conditions = rule["conditions"]
-                    group_result = self._evaluate_condition_group(conditions, logic, proposal, depth=0)
-                    if group_result:
-                        reason = rule.get("reason", "Composite policy conditions matched.")
-                        matched_rules.append(self._build_match(policy, rule, reason))
-                        rule_action = rule.get("action") or rule.get("decision", "ESCALATE")
-                        final_action, final_reason, final_target = self._update_final(
-                            final_action, final_reason, final_target, rule_action, reason, rule)
-                        if rule_action == "BLOCK":
-                            break
+                conditions = rule.get("conditions", [])
+                logic = rule.get("condition_logic", "AND")
+                is_single = rule.get("_single", False)
+
+                # Fail-closed for single-condition rules with a missing required param
+                if is_single and conditions:
+                    cond = conditions[0]
+                    op_name = cond.get("op", "eq")
+                    param = cond.get("param", "")
+
+                    if op_name not in ("exists", "not_exists") and param:
+                        param_value = self._extract_param_contextual(proposal, param)
+                        if param_value is None:
+                            rule_action = rule.get("action") or rule.get("decision", "ESCALATE")
+                            reason = (f"Required parameter '{param}' missing from proposal "
+                                      f"— applying rule (fail-closed).")
+                            matched_rules.append({
+                                **self._build_match(policy, rule, reason),
+                                "missing_param": True,
+                            })
+                            final_action, final_reason, final_target = self._update_final(
+                                final_action, final_reason, final_target, rule_action, reason, rule)
+                            if rule_action == "BLOCK":
+                                break
+                            continue
+
+                if not self._evaluate_condition_group(conditions, logic, proposal, depth=0):
                     continue
 
-                # Single condition evaluation
-                if cond is None:
-                    continue
-
-                # exists / not_exists — special operators that check presence, not value
-                op_name = cond.get("op", "eq")
-                if op_name == "exists":
-                    pv = self._extract_param_contextual(proposal, cond.get("param", ""))
-                    if pv is not None:
-                        reason = cond.get("reason", rule.get("reason", ""))
-                        matched_rules.append(self._build_match(policy, rule, reason))
-                        rule_action = rule.get("action") or rule.get("decision", "ESCALATE")
-                        final_action, final_reason, final_target = self._update_final(
-                            final_action, final_reason, final_target, rule_action, reason, rule)
-                        if rule_action == "BLOCK":
-                            break
-                    continue
-                if op_name == "not_exists":
-                    pv = self._extract_param_contextual(proposal, cond.get("param", ""))
-                    if pv is None:
-                        reason = cond.get("reason", rule.get("reason", ""))
-                        matched_rules.append(self._build_match(policy, rule, reason))
-                        rule_action = rule.get("action") or rule.get("decision", "ESCALATE")
-                        final_action, final_reason, final_target = self._update_final(
-                            final_action, final_reason, final_target, rule_action, reason, rule)
-                        if rule_action == "BLOCK":
-                            break
-                    continue
-
-                param_value = self._extract_param_contextual(proposal, cond.get("param", ""))
-                if param_value is None:
-                    if not cond.get("param"):
-                        continue
-                    rule_action = rule.get("action") or rule.get("decision", "ESCALATE")
-                    reason = (f"Required parameter '{cond['param']}' missing from proposal "
-                              f"— applying rule (fail-closed).")
-                    matched_rules.append({
-                        **self._build_match(policy, rule, reason),
-                        "missing_param": True,
-                    })
-                    if rule_action == "BLOCK":
-                        final_action = "BLOCK"
-                        final_reason = reason
-                        final_target = rule.get("target")
-                        break
-                    elif rule_action == "ESCALATE" and final_action != "BLOCK":
-                        final_action = "ESCALATE"
-                        final_reason = reason
-                        final_target = rule.get("target")
-                    continue
-
-                if self._evaluate_single_condition(cond, param_value):
-                    reason = cond.get("reason", rule.get("reason", ""))
-                    if isinstance(param_value, (int, float)):
-                        reason = reason.replace("${amount}", f"${param_value:,.2f}")
-                    if cond.get("param"):
-                        reason = reason.replace("${" + cond["param"] + "}", str(param_value))
-
-                    matched_rules.append(self._build_match(policy, rule, reason))
-                    rule_action = rule.get("action") or rule.get("decision", "ESCALATE")
-                    final_action, final_reason, final_target = self._update_final(
-                        final_action, final_reason, final_target, rule_action, reason, rule)
-                    if rule_action == "BLOCK":
-                        break
+                reason = rule.get("reason", "Policy conditions matched.")
+                reason = self._interpolate_reason(reason, conditions, proposal)
+                matched_rules.append(self._build_match(policy, rule, reason))
+                rule_action = rule.get("action") or rule.get("decision", "ESCALATE")
+                final_action, final_reason, final_target = self._update_final(
+                    final_action, final_reason, final_target, rule_action, reason, rule)
+                if rule_action == "BLOCK":
+                    break
 
         details = {"matched_rules": matched_rules, "escalate_to": final_target}
         if final_action == "PASS":
             return PipelineStageResult("policy_validation", "PASS", details,
                                        "All applicable policy rules passed.")
         return PipelineStageResult("policy_validation", final_action, details, final_reason)
+
+    def _interpolate_reason(self, reason: str, conditions: list[dict], proposal) -> str:
+        """Replace ${param} placeholders in reason strings."""
+        for cond in conditions:
+            if "conditions" in cond:
+                continue
+            param = cond.get("param", "")
+            if not param:
+                continue
+            pv = self._extract_param_contextual(proposal, param)
+            if pv is None:
+                continue
+            if isinstance(pv, (int, float)):
+                reason = reason.replace("${amount}", f"${pv:,.2f}")
+            reason = reason.replace("${" + param + "}", str(pv))
+        return reason
 
     # ── Condition group evaluation (AND/OR with nesting) ───────────────────
 

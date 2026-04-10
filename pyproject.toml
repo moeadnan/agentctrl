@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentctrl"
-version = "0.1.1"
-description = "The Institutional Governance Layer for AI Agents — intercept, evaluate, decide."
+version = "0.2.0"
+description = "Institutional control layer for AI agent actions — authority, policy, risk, and audit before execution."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
@@ -35,6 +35,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",
 ]
+
+[project.scripts]
+agentctrl = "agentctrl.cli:main"
 
 [project.urls]
 Homepage = "https://moeintel.com"

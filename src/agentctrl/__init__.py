@@ -36,7 +36,7 @@ from .types import (
 )
 from .runtime_gateway import RuntimeGateway
 from .policy_engine import PolicyEngine
-from .authority_graph import AuthorityGraphEngine
+from .authority_graph import AuthorityGraphEngine, FINANCE_SEED_GRAPH
 from .risk_engine import RiskEngine, RiskScore
 from .conflict_detector import ConflictDetector
 from .decorator import governed, GovernanceBlockedError, GovernanceEscalatedError
@@ -50,6 +50,7 @@ __all__ = [
     "RuntimeGateway",
     "PolicyEngine",
     "AuthorityGraphEngine",
+    "FINANCE_SEED_GRAPH",
     "RiskEngine",
     "RiskScore",
     "ConflictDetector",
