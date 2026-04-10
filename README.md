@@ -415,4 +415,4 @@ python -m pytest tests/ -v
 
 ---
 
-Built by [MoeIntel](https://moeintel.com). Created by [Mohammad Abu Jafar](https://github.com/moeadnan). [GitHub](https://github.com/moeintel/AgentCTRL)
+Built by [MoeIntel](https://moeintel.ai). Created by [Mohammad Abu Jafar](https://github.com/moeadnan). [GitHub](https://github.com/moeintel/AgentCTRL)

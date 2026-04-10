@@ -155,7 +155,7 @@ def cmd_init(args):
         print()
         print("Quick start:")
         print(f'  agentctrl validate --policies {target / "policies.json"} \\')
-        print(f'    \'{{"agent_id": "analyst", "action_type": "invoice.approve", "action_params": {{"amount": 6000}}}}\'')
+        print('    \'{"agent_id": "analyst", "action_type": "invoice.approve", "action_params": {"amount": 6000}}\'')
     else:
         print("No files created (all already exist).")
 

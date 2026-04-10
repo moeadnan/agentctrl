@@ -233,7 +233,7 @@ def _print_footer(results: list):
     print(f"  {DIM}5 stages × {len(results)} proposals = every action evaluated through:{RESET}")
     print(f"  {DIM}autonomy → policy → authority → risk → conflict{RESET}")
     print()
-    print(f"  {WHITE}pip install agentctrl{RESET}  {DIM}·{RESET}  {WHITE}github.com/moeintel/agentctrl{RESET}")
+    print(f"  {WHITE}pip install agentctrl{RESET}  {DIM}·{RESET}  {WHITE}github.com/moeintel/AgentCTRL{RESET}")
     print()
 
 

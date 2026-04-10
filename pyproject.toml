@@ -40,7 +40,7 @@ classifiers = [
 agentctrl = "agentctrl.cli:main"
 
 [project.urls]
-Homepage = "https://moeintel.com"
+Homepage = "https://moeintel.ai"
 Repository = "https://github.com/moeintel/AgentCTRL"
 Issues = "https://github.com/moeintel/AgentCTRL/issues"
 
