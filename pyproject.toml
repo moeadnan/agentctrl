@@ -38,8 +38,8 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://moeintel.com"
-Repository = "https://github.com/moeintel/agentctrl"
-Issues = "https://github.com/moeintel/agentctrl/issues"
+Repository = "https://github.com/moeintel/AgentCTRL"
+Issues = "https://github.com/moeintel/AgentCTRL/issues"
 
 [project.optional-dependencies]
 authority-graph = ["networkx>=3.0"]
