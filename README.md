@@ -1,5 +1,10 @@
 # AgentCTRL Core
 
+[![PyPI version](https://img.shields.io/pypi/v/agentctrl)](https://pypi.org/project/agentctrl/)
+[![CI](https://github.com/moeadnan/agentctrl/actions/workflows/ci.yml/badge.svg)](https://github.com/moeadnan/agentctrl/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/pypi/pyversions/agentctrl)](https://pypi.org/project/agentctrl/)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 **The Institutional Governance Layer for AI Agents**
 
 Governance decision pipeline for AI agent tool calls. Intercept, evaluate, decide — before execution.
@@ -15,25 +20,23 @@ Model providers answer "is this output safe?" — a model-level concern. `agentc
 - **Fail-closed.** Any pipeline error produces BLOCK, never silent approval.
 - **Structural enforcement.** Policies are operator-based rule matching, not prompt instructions. Authority is graph traversal. Risk is weighted factor scoring. None of this is prompt engineering.
 
-> **Status:** Working. 61 tests passing. Not yet published to PyPI.
+> **Status:** Working. 61 tests passing. Published on [PyPI](https://pypi.org/project/agentctrl/).
 
 ---
 
 ## Install
 
-> `agentctrl` is not yet on PyPI. Install from source:
-
 ```bash
-pip install -e .
+pip install agentctrl
 
 # With authority graph support (requires networkx):
-pip install -e ".[authority-graph]"
+pip install "agentctrl[authority-graph]"
 
 # With framework adapters:
-pip install -e ".[langchain]"      # LangChain / LangGraph
-pip install -e ".[openai-agents]"  # OpenAI Agents SDK
-pip install -e ".[crewai]"         # CrewAI
-pip install -e ".[all]"            # Everything
+pip install "agentctrl[langchain]"      # LangChain / LangGraph
+pip install "agentctrl[openai-agents]"  # OpenAI Agents SDK
+pip install "agentctrl[crewai]"         # CrewAI
+pip install "agentctrl[all]"            # Everything
 ```
 
 ## Quick Start
@@ -72,7 +75,7 @@ See [`examples/`](examples/) for complete, runnable integration examples:
 Run any example:
 
 ```bash
-pip install -e .
+pip install agentctrl
 python examples/bare_python.py
 ```
 
