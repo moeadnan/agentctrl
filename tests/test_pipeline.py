@@ -84,7 +84,7 @@ async def test_hooks_called():
 
     decisions = []
     hooks = PipelineHooks(
-        on_decision=lambda d, p, s, l: decisions.append(d),
+        on_decision=lambda d, p, s, log: decisions.append(d),
     )
     gateway = RuntimeGateway(hooks=hooks)
     await gateway.validate(ActionProposal(
