@@ -132,7 +132,8 @@ class TestEmptyAuthorityDefault:
         gw = RuntimeGateway()
         r = await gw.validate(ActionProposal(
             agent_id="agent-1", action_type="invoice.approve",
-            action_params={"amount": 100}, autonomy_level=2))
+            action_params={"amount": 100}, autonomy_level=2,
+            trust_context={"total_actions": 10, "success_rate": 0.95}))
         assert r.decision == "ALLOW"
 
 

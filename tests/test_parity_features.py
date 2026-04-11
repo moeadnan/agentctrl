@@ -91,7 +91,8 @@ class TestRiskEngineNewFactors:
         from agentctrl import RiskEngine, ActionProposal
         engine = RiskEngine()
         p = ActionProposal(agent_id="a", action_type="search",
-                           action_params={}, consequence_class="reversible")
+                           action_params={}, consequence_class="reversible",
+                           trust_context={"total_actions": 10, "success_rate": 0.95})
         score = await engine.score(p)
         assert score.score < 0.30
 
@@ -458,12 +459,14 @@ class TestGatewayNewFeatures:
         for _ in range(2):
             r = await gw.validate(ActionProposal(
                 agent_id="ap_analyst", action_type="invoice.approve",
-                action_params={"amount": 100}, autonomy_level=2))
+                action_params={"amount": 100}, autonomy_level=2,
+                trust_context={"total_actions": 10, "success_rate": 0.95}))
             assert r["decision"] == "ALLOW"
 
         r = await gw.validate(ActionProposal(
             agent_id="ap_analyst", action_type="invoice.approve",
-            action_params={"amount": 100}, autonomy_level=2))
+            action_params={"amount": 100}, autonomy_level=2,
+            trust_context={"total_actions": 10, "success_rate": 0.95}))
         assert r["decision"] == "BLOCK"
         assert "rate_limit" in r["pipeline"][0]["stage"]
 
@@ -476,7 +479,8 @@ class TestGatewayNewFeatures:
         gw = RuntimeGateway(autonomy_scopes=scopes)
         r = await gw.validate(ActionProposal(
             agent_id="ap_analyst", action_type="invoice.approve",
-            action_params={"amount": 3000}, autonomy_level=2))
+            action_params={"amount": 3000}, autonomy_level=2,
+            trust_context={"total_actions": 10, "success_rate": 0.95}))
         assert r["decision"] == "ALLOW"
 
     @pytest.mark.asyncio

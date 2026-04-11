@@ -30,6 +30,7 @@ async def test_low_risk_action_executes():
         action_type="invoice.approve",
         action_params={"amount": 1000},
         autonomy_level=2,
+        trust_context={"total_actions": 10, "success_rate": 0.95},
     ))
     assert result["decision"] == "ALLOW"
 

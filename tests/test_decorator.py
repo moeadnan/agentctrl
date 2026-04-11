@@ -26,7 +26,9 @@ async def test_governed_execute_happy_path():
 
     gateway = RuntimeGateway()
 
-    @governed(gateway=gateway, agent_id="ap_analyst", autonomy_level=2, action_type="invoice.approve")
+    @governed(gateway=gateway, agent_id="ap_analyst", autonomy_level=2,
+             action_type="invoice.approve",
+             trust_context={"total_actions": 10, "success_rate": 0.95})
     async def approve_invoice(amount: float):
         return {"ok": True, "amount": amount}
 

@@ -198,11 +198,22 @@ class RiskEngine:
                 "value": f"Daily exposure: ${daily_exposure:,.0f} (threshold: ${exp_threshold:,.0f})",
             })
 
-        # Trust calibration — agents with demonstrated reliability get a risk discount.
+        # Trust calibration — bidirectional risk adjustment based on agent track record.
+        # New agents (< new_agent_threshold actions) receive a risk surcharge.
+        # Proven agents (50+ actions, >90% success) receive a risk discount.
         trust_ctx = getattr(proposal, "trust_context", None) or {}
         trust_total_actions = trust_ctx.get("total_actions", 0)
         trust_success_rate = trust_ctx.get("success_rate", 0.0)
-        if trust_total_actions >= 50 and trust_success_rate > 0.90:
+        new_agent_threshold = self._factors.get("new_agent_premium", {}).get("threshold", 5)
+        new_agent_weight = self._factors.get("new_agent_premium", {}).get("weight", 0.35)
+        if trust_total_actions < new_agent_threshold:
+            total += new_agent_weight
+            factors.append({
+                "factor": "trust_calibration",
+                "contribution": round(new_agent_weight, 3),
+                "value": f"New agent — {trust_total_actions} prior actions (threshold: {new_agent_threshold})",
+            })
+        elif trust_total_actions >= 50 and trust_success_rate > 0.90:
             trust_discount = min(0.15, (trust_success_rate - 0.90) * 1.5)
             total = max(0.01, total - trust_discount)
             factors.append({

@@ -141,3 +141,42 @@ async def test_configurable_base_risks():
     score = await engine.score(proposal)
     base_factors = [f for f in score.factors if f.get("factor") == "base_action_risk"]
     assert base_factors[0]["contribution"] == 0.99
+
+
+@pytest.mark.asyncio
+async def test_new_agent_premium():
+    """New agents (< 5 actions) receive a risk surcharge via trust_calibration."""
+    from agentctrl import RiskEngine, ActionProposal
+
+    engine = RiskEngine()
+    proposal = ActionProposal(
+        agent_id="brand-new-agent",
+        action_type="invoice.approve",
+        action_params={"amount": 1000},
+        autonomy_level=2,
+        trust_context={"total_actions": 0, "success_rate": 0.0},
+    )
+    score = await engine.score(proposal)
+    trust = [f for f in score.factors if f.get("factor") == "trust_calibration"]
+    assert trust
+    assert trust[0]["contribution"] > 0
+    assert score.level in ("HIGH", "CRITICAL")
+
+
+@pytest.mark.asyncio
+async def test_new_agent_premium_bypassed_after_threshold():
+    """Agents above the new-agent threshold do not receive the surcharge."""
+    from agentctrl import RiskEngine, ActionProposal
+
+    engine = RiskEngine()
+    proposal = ActionProposal(
+        agent_id="established-agent",
+        action_type="invoice.approve",
+        action_params={"amount": 1000},
+        autonomy_level=2,
+        trust_context={"total_actions": 10, "success_rate": 0.90},
+    )
+    score = await engine.score(proposal)
+    trust = [f for f in score.factors if f.get("factor") == "trust_calibration"]
+    assert not trust
+    assert score.level in ("LOW", "MEDIUM")

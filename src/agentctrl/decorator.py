@@ -27,6 +27,7 @@ def governed(
     agent_id: str,
     autonomy_level: int = 2,
     action_type: str | None = None,
+    trust_context: dict | None = None,
 ):
     """Decorator that wraps an async function with governance evaluation.
 
@@ -53,6 +54,7 @@ def governed(
                 action_type=resolved_action_type,
                 action_params=action_params,
                 autonomy_level=autonomy_level,
+                trust_context=trust_context,
             )
 
             result = await gateway.validate(proposal)
