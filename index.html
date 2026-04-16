@@ -412,6 +412,28 @@ body {
   letter-spacing: 1.5px; margin-top: 2px; font-weight: 600;
 }
 
+/* ── SCREENSHOTS ───────────────────────────────── */
+.screenshot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.screenshot-card img {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.screenshot-card .sc-caption {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-top: 10px;
+  text-align: center;
+}
+
 /* ── DIVIDER ────────────────────────────────────── */
 .divider { max-width: 960px; margin: 0 auto; border-top: 1px solid var(--border); opacity: 0.7; }
 
@@ -1006,7 +1028,7 @@ body {
   .eval-stage { grid-template-columns: 28px 1fr; }
   .eval-stage .es-detail { display: none; }
   .feat-grid, .two-col, .strat-row { grid-template-columns: 1fr; }
-  .intro-two-col, .intro-moat-grid, .intro-layers, .intro-directions, .phase-row { grid-template-columns: 1fr; }
+  .intro-two-col, .intro-moat-grid, .intro-layers, .intro-directions, .phase-row, .screenshot-grid { grid-template-columns: 1fr; }
   .stat-strip { gap: 20px; }
   .decision-row { flex-direction: column; align-items: center; }
   .section { padding: 36px 20px; }
@@ -1033,6 +1055,7 @@ body {
 <!-- ── TABLE OF CONTENTS ───────────────────────────── -->
 <nav class="toc" id="toc">
   <a href="#introduction"><span class="toc-dot"></span>Introduction</a>
+  <a href="#platform-ui"><span class="toc-dot"></span>Platform UI</a>
   <a href="#pipeline"><span class="toc-dot"></span>Pipeline</a>
   <a href="#core"><span class="toc-dot"></span>Core</a>
   <a href="#demo"><span class="toc-dot"></span>Demo</a>
@@ -1261,6 +1284,25 @@ body {
         <div class="pc-name">Cross-Boundary Trust</div>
         <div class="pc-desc">Agents from different principals negotiate through a shared governance layer. Thesis only.</div>
       </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── PLATFORM UI ─────────────────────────────────── -->
+<section class="section" id="platform-ui">
+  <div class="section-tag">Platform</div>
+  <h2>The production UI</h2>
+  <p class="desc">Full-stack governance platform: Next.js 15, FastAPI, PostgreSQL, Redis. Role-based access, real-time escalation queue, signed audit trail.</p>
+  <div class="screenshot-grid">
+    <div class="screenshot-card">
+      <img src="screenshots/login.png" alt="AgentCTRL login page" loading="lazy">
+      <div class="sc-caption">Login with role-based quick-fill credentials</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="screenshots/dashboard.png" alt="AgentCTRL dashboard" loading="lazy">
+      <div class="sc-caption">Dashboard: pipeline overview, decision stats, quick actions</div>
     </div>
   </div>
 </section>
