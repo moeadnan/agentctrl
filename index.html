@@ -1128,6 +1128,7 @@ body {
   <a href="#platform-ui"><span class="toc-dot"></span>Platform UI</a>
   <a href="#pipeline"><span class="toc-dot"></span>Pipeline</a>
   <a href="#core"><span class="toc-dot"></span>Core</a>
+  <a href="#in-action"><span class="toc-dot"></span>In Action</a>
   <a href="#platform"><span class="toc-dot"></span>Platform</a>
   <a href="#strategy"><span class="toc-dot"></span>Strategy</a>
 </nav>
@@ -1602,6 +1603,60 @@ result <span class="op">=</span> <span class="kw">await</span> gateway.<span cla
 
 <div class="divider"></div>
 
+<!-- ── PIPELINE IN ACTION ─────────────────────────────── -->
+<section class="section" id="in-action">
+  <div class="section-tag">Pipeline in Action</div>
+  <h2>What happens when an agent proposes an action</h2>
+  <p class="desc">Real CLI output from <span class="mono" style="color:var(--amber);font-size:13px;">python -m agentctrl</span>. 6 scenarios, both outbound and inbound governance. Zero config, zero API keys.</p>
+
+  <div class="terminal">
+    <div class="term-bar">
+      <div class="td r"></div><div class="td y"></div><div class="td g"></div>
+      <span class="term-title">python -m agentctrl</span>
+    </div>
+    <div class="term-body">
+<div class="tl"><span class="br">──────────────────────────────────────────────────────────────────</span></div>
+<div class="tl"><span class="lb">  AgentCTRL — Governance Pipeline Demo</span></div>
+<div class="tl"><span class="d">  Institutional control layer for AI agent actions</span></div>
+<div class="tl"><span class="br">──────────────────────────────────────────────────────────────────</span></div>
+<div class="tl"></div>
+<div class="tl"><span class="d">  1.</span> <span class="lb">Routine invoice — within limits</span>  <span class="d">[outbound]</span></div>
+<div class="tl"><span class="d">     agent=</span><span class="ag">ap_analyst</span>  <span class="d">action=</span><span class="lb">invoice.approve</span></div>
+<div class="tl">     <span class="a">&#10003; ALLOW</span>  <span class="rk">risk=0.20 (LOW)</span></div>
+<div class="tl"><span class="d">     pipeline: ·autonomy ·policy ·authority ·risk ·conflict</span></div>
+<div class="tl"></div>
+<div class="tl"><span class="d">  2.</span> <span class="lb">High-value invoice — exceeds policy threshold</span>  <span class="d">[outbound]</span></div>
+<div class="tl"><span class="d">     agent=</span><span class="ag">ap_analyst</span>  <span class="d">action=</span><span class="lb">invoice.approve</span></div>
+<div class="tl">     <span class="e">&#9888; ESCALATE</span>  <span class="rk">risk=0.25 (LOW)</span></div>
+<div class="tl"><span class="rs">     → Invoice amount exceeds $5,000 autonomous approval threshold.</span></div>
+<div class="tl"></div>
+<div class="tl"><span class="d">  3.</span> <span class="lb">Wire transfer — agent not authorized</span>  <span class="d">[outbound]</span></div>
+<div class="tl"><span class="d">     agent=</span><span class="ag">ap_analyst</span>  <span class="d">action=</span><span class="lb">wire_transfer.execute</span></div>
+<div class="tl">     <span class="bk">&#10007; BLOCK</span>  <span class="rk">risk=0.45 (MEDIUM)</span></div>
+<div class="tl"><span class="rs">     → Agent 'AP Analyst' is not authorized for 'wire_transfer.execute'.</span></div>
+<div class="tl"></div>
+<div class="tl"><span class="d">  4.</span> <span class="lb">PII data query — policy escalation</span>  <span class="d">[outbound]</span></div>
+<div class="tl"><span class="d">     agent=</span><span class="ag">ap_analyst</span>  <span class="d">action=</span><span class="lb">data.read</span></div>
+<div class="tl">     <span class="e">&#9888; ESCALATE</span>  <span class="rk">risk=0.40 (MEDIUM)</span></div>
+<div class="tl"><span class="rs">     → PII data access requires explicit data owner approval.</span></div>
+<div class="tl"></div>
+<div class="tl"><span class="d">  5.</span> <span class="lb">Inbound: unknown agent requests access</span>  <span class="d">[inbound]</span></div>
+<div class="tl"><span class="d">     agent=</span><span class="ag">external-agent-xyz</span>  <span class="d">action=</span><span class="lb">api.access</span></div>
+<div class="tl">     <span class="bk">&#10007; BLOCK</span>  <span class="rk">risk=0.15 (LOW)</span></div>
+<div class="tl"><span class="rs">     → Unverified external agent — action blocked by policy.</span></div>
+<div class="tl"></div>
+<div class="tl"><span class="d">  6.</span> <span class="lb">Inbound: verified partner agent</span>  <span class="d">[inbound]</span></div>
+<div class="tl"><span class="d">     agent=</span><span class="ag">partner-agent-acme</span>  <span class="d">action=</span><span class="lb">api.access</span></div>
+<div class="tl">     <span class="a">&#10003; ALLOW</span>  <span class="rk">risk=0.15 (LOW)</span></div>
+<div class="tl"></div>
+<div class="tl"><span class="br">──────────────────────────────────────────────────────────────────</span></div>
+<div class="tl"><span class="d">  </span><span class="a">2 ALLOWED</span>  <span class="e">2 ESCALATED</span>  <span class="bk">2 BLOCKED</span><span class="d">  — 6 actions evaluated</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
 <!-- ── PLATFORM SCOPE ──────────────────────────────── -->
 <section class="section" id="platform">
   <div class="section-tag">Full Platform</div>
@@ -1693,7 +1748,7 @@ result <span class="op">=</span> <span class="kw">await</span> gateway.<span cla
 
 <script>
 (function() {
-  var ids = ['introduction','platform-ui','pipeline','core','platform','strategy'];
+  var ids = ['introduction','platform-ui','pipeline','core','in-action','platform','strategy'];
   var links = document.querySelectorAll('#toc a');
   var sections = ids.map(function(id) { return document.getElementById(id); });
 
