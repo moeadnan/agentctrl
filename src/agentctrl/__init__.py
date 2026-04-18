@@ -41,6 +41,39 @@ from .risk_engine import RiskEngine, RiskScore
 from .conflict_detector import ConflictDetector
 from .decorator import governed, GovernanceBlockedError, GovernanceEscalatedError
 
+
+def register_hook(hook_type: str, fn):
+    """Register a runner lifecycle hook (Phase 17 / T1.10).
+
+    Valid hook_type values: ``SessionStart``, ``SessionEnd``, ``PreToolUse``,
+    ``PostToolUse``, ``SubagentStop``.  Hooks are only invoked when you
+    drive the CLI runner via ``run_agent`` or ``agentctrl run``; direct
+    ``RuntimeGateway.validate`` calls bypass them by design.
+    """
+    # Deferred import — the runner pulls in LangChain at module load time
+    # only if you actually use it.  Registering hooks must not force that
+    # dep on callers that just want governance.
+    from .runner import register_hook as _register
+    return _register(hook_type, fn)
+
+
+def clear_hooks(hook_type=None):
+    """Clear one hook type (or all) — primarily a test aid."""
+    from .runner import clear_hooks as _clear
+    return _clear(hook_type)
+
+
+def run_agent(*args, **kwargs):
+    """Programmatic entrypoint for the CLI runner.
+
+    See ``agentctrl.runner.run_agent`` for the full signature.  This
+    shim exists so callers can import from the package root without
+    triggering LangChain imports eagerly.
+    """
+    from .runner import run_agent as _run
+    return _run(*args, **kwargs)
+
+
 __all__ = [
     "ActionProposal",
     "PipelineStageResult",
@@ -57,4 +90,8 @@ __all__ = [
     "governed",
     "GovernanceBlockedError",
     "GovernanceEscalatedError",
+    # Phase 17 (runner lifecycle hooks + programmatic runner entry point)
+    "register_hook",
+    "clear_hooks",
+    "run_agent",
 ]

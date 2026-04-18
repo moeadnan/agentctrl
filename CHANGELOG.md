@@ -6,17 +6,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pr
 
 ---
 
+## [Unreleased]
+
+Work landed on `main` after the 0.2.3 PyPI release; will ship in the next version bump.
+
+### Added
+- **Programmatic runner API** (`agentctrl.run_agent`) — new `runner.py` module exposes a programmatic entry point for running governed agents from Python without going through the CLI.
+- **Lifecycle hooks** — `register_hook` / `clear_hooks` exports for `SessionStart`, `SessionEnd`, `PreToolUse`, `PostToolUse`, `SubagentStop` events.
+- **`agentctrl run "<goal>"` CLI subcommand** — governed ReAct loop invocation from the command line. Streams reasoning tokens and tool-call events.
+- **`docs/GOVERNANCE_REPUDIATION.md`** — written repudiation contract describing what the library will and will not do on behalf of the governed system.
+- 3 new public exports: `register_hook`, `clear_hooks`, `run_agent` (exports now total 18, was 15).
+
+---
+
 ## [0.2.3] — 2026-04-17
 
 ### Added
 - **Per-action-type trust signals.** `trust_context["action_trust"]` with per-action-type `total_actions` and `success_rate` now override the global trust signals when scoring. An agent can demonstrate action-specific proficiency independent of overall track record (e.g. proven at `search`, new at `write_file`).
 - **Calibration-accuracy weighting.** `trust_context["calibration_accuracy"]` (0.0–1.0) scales both the new-agent surcharge and the proven-agent discount. Low calibration accuracy shrinks the magnitude of the trust adjustment, so unreliable prediction history does not aggressively push decisions.
-- Default policy now covers autonomy levels 4 and 5 (full autonomy, full independence). Previously the example policy capped at level 3.
 - 3 new tests: `test_calibration_accuracy_scales_discount`, `test_action_trust_overrides_global`, `test_calibration_accuracy_scales_surcharge`.
 
 ### Changed
 - Trust-calibration contribution message now includes `(cal=NN%)` when calibration accuracy is below 1.0, surfacing the weighting in the decision record.
 - Test count: 79 → 82.
+
+### Note on autonomy scale
+The canonical autonomy scale is **0–3** (matches the platform DB enum). Earlier drafts of this entry referenced levels 4 and 5; that language was corrected on 2026-04-18 because no such levels exist in the released code. See `packages/agentctrl/src/agentctrl/runtime_gateway.py` `AUTONOMY_LEVEL_ACTIONS` for the canonical mapping.
 
 ---
 

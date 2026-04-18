@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""agentctrl CLI — demo, validate, init.
+"""agentctrl CLI — demo, validate, init, run.
 
 Usage:
     agentctrl demo              Run the governance pipeline demo
     agentctrl validate          Validate a JSON action proposal
     agentctrl init              Scaffold starter config files
+    agentctrl run "<goal>"      Run a governed agent against a goal (Phase 11 / T1.6)
 """
 
 import argparse
@@ -180,6 +181,35 @@ def main():
     init_p.add_argument("--dir", default=".agentctrl",
                         help="Directory for config files (default: .agentctrl)")
 
+    # Phase 11 / T1.6 — `agentctrl run "<goal>"`
+    run_p = sub.add_parser(
+        "run",
+        help="Run a governed agent against a goal (needs `agentctrl[run]` extras)",
+    )
+    run_p.add_argument("goal", help="Plain-English goal for the agent.")
+    run_p.add_argument("--provider", default="openai",
+                       choices=["openai", "anthropic", "ollama", "k2think"],
+                       help="LLM provider (Phase 15 / T1.12). Default openai.")
+    run_p.add_argument("--model", default="",
+                       help="Model name (provider-specific; leave empty for the provider's default).")
+    run_p.add_argument("--autonomy-level", type=int, default=2,
+                       choices=[0, 1, 2, 3],
+                       help="Agent autonomy level (0=suggest, 1=approval, 2=limited, 3=full).")
+    run_p.add_argument("--max-steps", type=int, default=5,
+                       help="Maximum ReAct steps before bailing out (default 5).")
+    run_p.add_argument("--agent-id", default="cli-agent",
+                       help="Agent identifier used in governance proposals.")
+    run_p.add_argument("--json", action="store_true",
+                       help="Stream NDJSON events instead of pretty output (Phase 12 / T1.7).")
+    run_p.add_argument("--plan", dest="plan_only", action="store_true",
+                       help="Plan-only mode — print planned tool calls without executing them (T1.3).")
+    ask_group = run_p.add_mutually_exclusive_group()
+    ask_group.add_argument("--ask-before-tool", dest="ask_before_tool", action="store_true",
+                           default=None,
+                           help="Force interactive approval on every ESCALATE (Phase 14 / T1.11).")
+    ask_group.add_argument("--no-ask", dest="ask_before_tool", action="store_false",
+                           help="Disable interactive approval even on a TTY.")
+
     args = parser.parse_args()
 
     if args.command == "demo":
@@ -188,9 +218,29 @@ def main():
         cmd_validate(args)
     elif args.command == "init":
         cmd_init(args)
+    elif args.command == "run":
+        cmd_run(args)
     else:
         parser.print_help()
         sys.exit(0)
+
+
+def cmd_run(args):
+    """Run a governed agent against a goal (Phase 11 / T1.6)."""
+    from .runner import run_agent
+
+    rc = run_agent(
+        args.goal,
+        provider=getattr(args, "provider", "openai"),
+        model=args.model,
+        autonomy_level=args.autonomy_level,
+        max_steps=args.max_steps,
+        agent_id=args.agent_id,
+        json_mode=getattr(args, "json", False),
+        ask_before_tool=getattr(args, "ask_before_tool", None),
+        plan_only=getattr(args, "plan_only", False),
+    )
+    sys.exit(rc)
 
 
 if __name__ == "__main__":

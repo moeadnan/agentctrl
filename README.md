@@ -367,8 +367,17 @@ from agentctrl import (
     governed,                # @governed enforcement decorator
     GovernanceBlockedError,  # Raised on BLOCK
     GovernanceEscalatedError,# Raised on ESCALATE
+
+    # Programmatic runner + lifecycle hooks
+    run_agent,               # Run a governed ReAct loop from Python
+    register_hook,           # Subscribe to lifecycle events
+    clear_hooks,             # Clear registered hooks
 )
 ```
+
+### Programmatic runner
+
+`run_agent` is a Python-level entry point mirroring the `agentctrl run "<goal>"` CLI subcommand. Every tool call the inner ReAct loop attempts passes through `RuntimeGateway.validate()`. Lifecycle events — `SessionStart`, `SessionEnd`, `PreToolUse`, `PostToolUse`, `SubagentStop` — are observable via `register_hook`. See [`packages/agentctrl/docs/GOVERNANCE_REPUDIATION.md`](docs/GOVERNANCE_REPUDIATION.md) for the repudiation contract and the behavioural guarantees the runner maintains.
 
 ### `RuntimeGateway`
 
