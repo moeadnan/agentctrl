@@ -14,13 +14,13 @@
 - `risk_scoring` — weighted sum of categorical risk dimensions.
 - `conflict_detection` — set intersection over active workflows.
 
-Two pre-gates — the **kill switch** and the **rate limiter** — are equally LLM-free. The first is a boolean flag on the agent; the second is an integer bucket.
+Two pre-gates — the **kill switch** and the **rate limiter** — are equally LLM-free. The kill switch is deployment-supplied pause state checked before stage evaluation; the rate limiter is a deterministic counter backend.
 
 ## 2. Why this matters
 
 An LLM-judged decision is, by construction, **non-repudiable**. The same model, given the same prompt, can produce different outputs across versions, temperatures, providers, tenants, or even runs. You cannot re-prove the decision after the fact, which means you cannot defend it to an auditor, a regulator, or a counter-party.
 
-AgentCTRL's decisions are **repudiable**: given the stored `ActionProposal`, the stored policy set, and the stored authority graph at the time of decision, re-running `validate()` produces byte-identical output. That is the contract regulated buyers need, and it is the contract model-vendor governance cannot offer because their very business is running the model.
+AgentCTRL's decisions are **repudiable**: given the identical `ActionProposal`, policy set, authority graph, runtime configuration, and time inputs used at decision time, re-running `validate()` produces the same structured decision. That is the contract regulated buyers need, and it is the contract model-vendor governance cannot offer because their very business is running the model.
 
 ## 3. What this excludes (deliberately)
 

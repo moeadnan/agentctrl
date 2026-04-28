@@ -30,7 +30,6 @@ unhandled exception during pipeline evaluation produces BLOCK.
 
 import json
 import logging
-import time
 from datetime import datetime, timezone
 from typing import Callable, Awaitable
 
@@ -43,6 +42,9 @@ from .types import ActionProposal, PipelineHooks, PipelineStageResult, RuntimeDe
 logger = logging.getLogger("agentctrl.runtime")
 
 KillSwitchFn = Callable[[str], Awaitable[tuple[bool, str]]]
+
+# Strong refs for fire-and-forget block-alert tasks (prevents GC drop)
+_BLOCK_ALERT_TASKS: set = set()
 
 
 class RuntimeGateway:
@@ -82,6 +84,7 @@ class RuntimeGateway:
         risk_engine: RiskEngine | None = None,
         rate_limits: list[dict] | None = None,
         audit_log: str | None = None,
+        rate_limit_backend=None,
     ):
         self.policy_engine = policy_engine or PolicyEngine()
         self.authority_engine = authority_engine or AuthorityGraphEngine()
@@ -90,7 +93,16 @@ class RuntimeGateway:
         self.hooks = hooks
         self._kill_switch_fn = kill_switch_fn
         self._rate_limits = rate_limits or []
-        self._rate_buckets: dict[str, list[float]] = {}
+        # Pluggable rate-limit backend (parity with platform).  The library
+        # ships an in-memory backend so single-process consumers and tests
+        # work out of the box; cluster consumers must inject a Redis (or
+        # equivalent) backend that satisfies ``RateLimitBackend``.  See
+        # ``agentctrl.rate_limit`` for the protocol.
+        if rate_limit_backend is None and self._rate_limits:
+            from .rate_limit import InMemoryRateLimitBackend
+            self._rate_limit_backend = InMemoryRateLimitBackend()
+        else:
+            self._rate_limit_backend = rate_limit_backend
         self._audit_log_path = audit_log
         if autonomy_scopes is not None:
             self._autonomy_scopes = autonomy_scopes
@@ -321,11 +333,15 @@ class RuntimeGateway:
         return True
 
     async def _check_rate_limit(self, proposal: ActionProposal) -> PipelineStageResult | None:
-        """Pre-gate: check rate limits with burst detection and rate_pressure signal."""
-        if not self._rate_limits:
+        """Pre-gate: check rate limits via the injected backend.
+
+        Backend errors fail-safe to BLOCK (consistent with platform).
+        """
+        if not self._rate_limits or self._rate_limit_backend is None:
             return None
+        from .rate_limit import RateLimitBackendError
+
         agent_id = proposal.agent_id
-        now = time.monotonic()
         max_pressure = 0.0
 
         for rl in self._rate_limits:
@@ -339,16 +355,33 @@ class RuntimeGateway:
             if target_type == "action_type" and target_id != proposal.action_type:
                 continue
 
-            key = f"rl:{target_type}:{target_id}"
-            bucket = self._rate_buckets.setdefault(key, [])
-            cutoff = now - window
-            self._rate_buckets[key] = [t for t in bucket if t > cutoff]
+            key_target = agent_id if target_type == "agent" else target_id
+            key = f"{target_type}:{key_target}"
+            burst_window = min(5.0, float(window))
 
-            current_count = len(self._rate_buckets[key])
-            pressure = current_count / max(max_req, 1)
+            try:
+                result = await self._rate_limit_backend.record_and_check(
+                    key=key,
+                    max_requests=max_req,
+                    window_seconds=int(window),
+                    burst_window=burst_window,
+                )
+            except RateLimitBackendError as exc:
+                logger.critical(
+                    "Rate-limit backend unavailable — fail-safe BLOCKING proposal %s: %s",
+                    proposal.proposal_id, exc,
+                )
+                proposal.context["rate_pressure"] = 1.0
+                return PipelineStageResult(
+                    "rate_limit", "BLOCK",
+                    {"backend_error": str(exc)[:200]},
+                    "Rate limit backend is unreachable — blocking for safety.",
+                )
+
+            pressure = result.current_count / max(max_req, 1)
             max_pressure = max(max_pressure, pressure)
 
-            if current_count >= max_req:
+            if result.current_count > max_req:
                 proposal.context["rate_pressure"] = round(min(pressure, 1.0), 3)
                 return PipelineStageResult(
                     "rate_limit", "BLOCK",
@@ -356,23 +389,17 @@ class RuntimeGateway:
                     f"Rate limit exceeded: {max_req} requests per {window}s for {target_type}:{target_id}.",
                 )
 
-            # Burst detection: >50% of limit consumed in last 5 seconds
-            burst_window = min(5.0, window)
-            burst_cutoff = now - burst_window
-            burst_count = sum(1 for t in self._rate_buckets[key] if t > burst_cutoff)
             burst_threshold = max(max_req * 0.5, 3)
-            if burst_count >= burst_threshold:
+            if result.burst_count > burst_threshold:
                 proposal.context["rate_pressure"] = round(min(pressure, 1.0), 3)
                 return PipelineStageResult(
                     "rate_limit", "BLOCK",
                     {"limit": max_req, "window_seconds": window, "burst": True,
-                     "burst_count": burst_count, "burst_window": burst_window,
+                     "burst_count": result.burst_count, "burst_window": burst_window,
                      "rate_pressure": round(pressure, 3)},
-                    (f"Burst detected: {burst_count} requests in {burst_window:.0f}s "
+                    (f"Burst detected: {result.burst_count} requests in {burst_window:.0f}s "
                      f"(threshold: {burst_threshold:.0f}) for {target_type}:{target_id}."),
                 )
-
-            self._rate_buckets[key].append(now)
 
         if max_pressure > 0:
             proposal.context["rate_pressure"] = round(min(max_pressure, 1.0), 3)
@@ -396,7 +423,11 @@ class RuntimeGateway:
             if decision == "BLOCK" and self.hooks.on_block_alert:
                 try:
                     import asyncio
-                    asyncio.ensure_future(self.hooks.on_block_alert(proposal, reason, risk_level))
+                    loop = asyncio.get_running_loop()
+                    _t = loop.create_task(self.hooks.on_block_alert(proposal, reason, risk_level))
+                    # Retain a strong reference so the task is not GC'd mid-flight
+                    _BLOCK_ALERT_TASKS.add(_t)
+                    _t.add_done_callback(_BLOCK_ALERT_TASKS.discard)
                 except Exception:
                     pass
             if self.hooks.on_broadcast:

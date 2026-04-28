@@ -6,16 +6,90 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pr
 
 ---
 
-## [Unreleased]
+## [0.3.0] — 2026-04-19
 
-Work landed on `main` after the 0.2.3 PyPI release; will ship in the next version bump.
+### Added — Pluggable rate-limit backend protocol
 
-### Added
+`RuntimeGateway` previously embedded a per-process dict-based rate
+counter. That was correct for single-process consumers but unsafe under
+cluster deployment: each worker maintained its own bucket, so an agent
+could burst past `max_requests` by hitting different pods, and worker
+restarts wiped the state silently.
+
+This release introduces a pluggable backend protocol so external
+consumers can inject a cluster-safe store (Redis INCR/EXPIRE, DynamoDB
+atomic counters, etc.) without forking the library.
+
+- **`RateLimitBackend`** — `@runtime_checkable` Protocol with a single
+  `record_and_check(key, max_requests, window_seconds, burst_window)`
+  method.
+- **`BackendResult`** — dataclass returned by backends; carries
+  `current_count`, `burst_count`, and the rule parameters.
+- **`InMemoryRateLimitBackend`** — default single-process fallback so
+  tests and dev workflows work out of the box. NOT cluster-safe by
+  design; production consumers MUST inject a cluster-safe backend.
+- **`RateLimitBackendError`** — raised by backends when the underlying
+  store is unreachable. The gateway interprets this as a fail-safe
+  BLOCK rather than admitting the request — consistent with the
+  kill-switch fail-safe contract. Silent fallback is forbidden.
+- **`RuntimeGateway(rate_limit_backend=...)`** — new kwarg to inject
+  a backend instance.
+- 7 new tests in `tests/test_rate_limit.py` covering in-memory counter
+  semantics, protocol conformance, and gateway fail-safe BLOCK when a
+  backend raises.
+- 4 new public exports: `BackendResult`, `InMemoryRateLimitBackend`,
+  `RateLimitBackend`, `RateLimitBackendError` (exports now total 22,
+  was 18).
+
+### Added — From previous Unreleased section
+
 - **Programmatic runner API** (`agentctrl.run_agent`) — new `runner.py` module exposes a programmatic entry point for running governed agents from Python without going through the CLI.
 - **Lifecycle hooks** — `register_hook` / `clear_hooks` exports for `SessionStart`, `SessionEnd`, `PreToolUse`, `PostToolUse`, `SubagentStop` events.
 - **`agentctrl run "<goal>"` CLI subcommand** — governed ReAct loop invocation from the command line. Streams reasoning tokens and tool-call events.
 - **`docs/GOVERNANCE_REPUDIATION.md`** — written repudiation contract describing what the library will and will not do on behalf of the governed system.
-- 3 new public exports: `register_hook`, `clear_hooks`, `run_agent` (exports now total 18, was 15).
+
+### Changed
+- Fire-and-forget block-alert hooks now use `loop.create_task` with a
+  module-level strong-ref set, replacing the deprecated
+  `asyncio.ensure_future` call. Fixes intermittent task drop under GC
+  pressure and loop-swap scenarios (test harnesses, uvicorn reload).
+- Test count: 82 → 88.
+
+### Migration notes for 0.2.x → 0.3.0
+
+* **Existing code continues to work unchanged.** `RuntimeGateway`
+  without `rate_limit_backend=` gets the in-memory fallback — identical
+  behaviour to 0.2.x.
+* **Production consumers should inject a cluster-safe backend.**
+  Example with redis-py:
+
+  ```python
+  import redis.asyncio as aioredis
+  from agentctrl import RuntimeGateway, RateLimitBackend, RateLimitBackendError
+
+  class RedisRateLimitBackend:
+      def __init__(self, client): self._r = client
+      async def record_and_check(self, key, max_requests, window_seconds, burst_window):
+          try:
+              pipe = self._r.pipeline(transaction=False)
+              pipe.incr(f"agentctrl:rl:{key}:w{window_seconds}")
+              pipe.incr(f"agentctrl:rl:{key}:b{int(burst_window * 1000)}")
+              w, b = await pipe.execute()
+              if w == 1: await self._r.expire(f"agentctrl:rl:{key}:w{window_seconds}", window_seconds)
+              if b == 1: await self._r.expire(f"agentctrl:rl:{key}:b{int(burst_window * 1000)}", max(int(burst_window) + 1, 1))
+          except Exception as exc:
+              raise RateLimitBackendError(str(exc)) from exc
+          from agentctrl import BackendResult
+          return BackendResult(current_count=int(w), burst_count=int(b),
+                               max_requests=max_requests,
+                               window_seconds=window_seconds,
+                               burst_window=burst_window)
+
+  gateway = RuntimeGateway(
+      rate_limits=[...],
+      rate_limit_backend=RedisRateLimitBackend(aioredis.from_url(url)),
+  )
+  ```
 
 ---
 

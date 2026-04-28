@@ -40,7 +40,7 @@ We will acknowledge receipt within 48 hours and provide a fix or mitigation plan
 
 | Version | Supported |
 |---------|-----------|
-| 0.2.x   | Yes       |
-| < 0.2   | No        |
+| 0.3.x   | Yes       |
+| < 0.3   | No        |
 
 Security fixes will be applied to the latest release.

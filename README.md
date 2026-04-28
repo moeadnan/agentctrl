@@ -76,7 +76,7 @@ Those are institutional controls. They existed for human employees. They need to
 - **Fail-closed.** Any pipeline error produces BLOCK, never silent approval.
 - **Structural enforcement.** Policies are operator-based rule matching, not prompt instructions. Authority is graph traversal. Risk is weighted factor scoring. None of this is prompt engineering.
 
-> **Status:** 82 tests passing. Published on [PyPI](https://pypi.org/project/agentctrl/).
+> **Status:** 89 tests (88 pass, 1 skipped when `networkx` not installed). Published on [PyPI](https://pypi.org/project/agentctrl/).
 
 ---
 
@@ -215,6 +215,8 @@ if result.decision != "ALLOW":
 ```
 
 See [`examples/inbound_governance.py`](examples/inbound_governance.py) for the full pattern including FastAPI and MCP integration.
+
+> **MCP — outbound calls.** When *your* agents call external MCP servers, the same primitive applies: wrap each call with the gateway before invoking the MCP client. The standalone library does not ship an MCP adapter, but the AgentCTRL platform's `McpAdapter` shows the reference pattern. Every MCP tool call traverses the same 5-stage pipeline as a native tool call, enforced via the post-validation `ApprovedAction` contract and a registry-level governance-context guard. See [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md) for the full call chain and the verifying integration test.
 
 ---
 
@@ -372,6 +374,14 @@ from agentctrl import (
     run_agent,               # Run a governed ReAct loop from Python
     register_hook,           # Subscribe to lifecycle events
     clear_hooks,             # Clear registered hooks
+
+    # Pluggable rate-limit backend (0.3.0+) — cluster-safe consumers
+    # inject their own backend; in-memory default keeps single-process
+    # use and tests working unchanged.
+    RateLimitBackend,        # Protocol — consumer implements Redis/etc.
+    InMemoryRateLimitBackend, # Process-local default (NOT cluster-safe)
+    BackendResult,           # Returned by record_and_check
+    RateLimitBackendError,   # Raised on backend unreachable → fail-safe BLOCK
 )
 ```
 
@@ -390,6 +400,7 @@ gateway = RuntimeGateway(
     autonomy_scopes=None,    # dict mapping level to action type list
     risk_engine=None,        # RiskEngine or None (uses defaults)
     rate_limits=None,        # list of rate limit dicts
+    rate_limit_backend=None, # RateLimitBackend or None (in-memory fallback)
     audit_log=None,          # path to JSONL audit log file
 )
 
@@ -410,7 +421,7 @@ result = await gateway.validate(proposal)
 python -m pytest tests/ -v
 ```
 
-82 tests covering: pipeline stages, advisory context, fail-closed behavior, policy evaluation (AND/OR groups, 14 operators, temporal conditions), authority graph (delegation, SoD, limits, decay), risk scoring (13 dimensions, trust calibration with accuracy scaling and action-type override, consequence class), conflict detection, `@governed` decorator, CLI, demo, audit logging, subscriptable record, empty authority default, instance isolation, and library boundary.
+89 tests (88 pass, 1 skipped when `networkx` not installed) covering: pipeline stages, advisory context, fail-closed behavior, policy evaluation (AND/OR groups, 14 operators, temporal conditions), authority graph (delegation, SoD, limits, decay), risk scoring (13 dimensions, trust calibration with accuracy scaling and action-type override, consequence class), conflict detection, `@governed` decorator, CLI, demo, audit logging, subscriptable record, empty authority default, instance isolation, library boundary, and pluggable rate-limit backend (protocol conformance, in-memory counter, fail-safe BLOCK on backend unreachable).
 
 ## Requirements
 

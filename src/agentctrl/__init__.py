@@ -40,6 +40,12 @@ from .authority_graph import AuthorityGraphEngine, FINANCE_SEED_GRAPH
 from .risk_engine import RiskEngine, RiskScore
 from .conflict_detector import ConflictDetector
 from .decorator import governed, GovernanceBlockedError, GovernanceEscalatedError
+from .rate_limit import (
+    BackendResult,
+    InMemoryRateLimitBackend,
+    RateLimitBackend,
+    RateLimitBackendError,
+)
 
 
 def register_hook(hook_type: str, fn):
@@ -90,6 +96,11 @@ __all__ = [
     "governed",
     "GovernanceBlockedError",
     "GovernanceEscalatedError",
+    # Cluster-safe rate-limit backend protocol (consumer implements Redis/etc.)
+    "BackendResult",
+    "InMemoryRateLimitBackend",
+    "RateLimitBackend",
+    "RateLimitBackendError",
     # Phase 17 (runner lifecycle hooks + programmatic runner entry point)
     "register_hook",
     "clear_hooks",
