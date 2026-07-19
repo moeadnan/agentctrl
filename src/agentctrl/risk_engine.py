@@ -208,10 +208,14 @@ class RiskEngine:
 
         at_total = action_trust.get("total_actions", 0)
         effective_total = at_total if at_total > 0 else trust_ctx.get("total_actions", 0)
-        effective_rate = (
-            action_trust.get("success_rate", 0.0) if at_total > 0
-            else trust_ctx.get("success_rate", 0.0)
-        )
+        # Prefer outcome-informed quality when trust_context supplies Phase 3 keys.
+        if at_total > 0:
+            oq = action_trust.get("outcome_quality_fraction")
+            gov_fallback = action_trust.get("success_rate", 0.0)
+        else:
+            oq = trust_ctx.get("outcome_quality_fraction")
+            gov_fallback = trust_ctx.get("success_rate", 0.0)
+        effective_rate = gov_fallback if oq is None else oq
 
         maturity_threshold = self._factors.get("new_agent_premium", {}).get("threshold", 5)
         max_surcharge = self._factors.get("new_agent_premium", {}).get("weight", 0.35)

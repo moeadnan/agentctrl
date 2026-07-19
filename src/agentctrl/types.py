@@ -29,7 +29,14 @@ class ActionProposal:
     """Structured proposal submitted by an agent for governance evaluation.
 
     trust_context expected shape (optional — no-op when empty):
-        {"total_actions": int, "success_rate": float, "trust_balance": float}
+        {
+          "total_actions": int,
+          "success_rate": float,  # governance ALLOW-share fallback
+          "trust_balance": float,
+          "calibration_accuracy": float,  # optional; scales surcharge/discount
+          "action_trust": {"total_actions", "success_rate", "outcome_quality_fraction", ...},
+          "outcome_quality_fraction": float | None  # Phase 3: prefers over success_rate when set
+        }
     """
     agent_id: str
     action_type: str

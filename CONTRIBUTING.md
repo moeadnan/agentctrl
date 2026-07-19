@@ -33,7 +33,7 @@ This installs the library in editable mode with all optional dependencies (netwo
 python -m pytest tests/ -v
 ```
 
-89 tests total (88 pass, 1 skipped when `networkx` not installed). No external services required — everything runs in-process.
+90 tests total (89 pass, 1 skipped when `networkx` not installed). No external services required — everything runs in-process.
 
 ---
 

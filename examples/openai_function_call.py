@@ -101,7 +101,9 @@ gateway = RuntimeGateway(
     policy_engine=PolicyEngine(policies=POLICIES),
     authority_engine=AuthorityGraphEngine(graph_data=AUTHORITY),
     hooks=PipelineHooks(
-        on_decision=lambda d, p, s, l: print(f"  [governance] {d} → {p.action_type} (risk: {s:.2f})"),
+        on_decision=lambda decision, proposal, score, latency: print(
+            f"  [governance] {decision} → {proposal.action_type} (risk: {score:.2f})"
+        ),
     ),
     autonomy_scopes={
         0: [],

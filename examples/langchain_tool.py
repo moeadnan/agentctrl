@@ -42,8 +42,6 @@ from agentctrl import (
     ActionProposal,
     PolicyEngine,
     AuthorityGraphEngine,
-    GovernanceBlockedError,
-    GovernanceEscalatedError,
 )
 
 # --- Governance setup ---
