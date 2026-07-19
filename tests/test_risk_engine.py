@@ -234,6 +234,47 @@ async def test_action_trust_overrides_global():
 
 
 @pytest.mark.asyncio
+async def test_outcome_quality_fraction_weakens_discount_vs_allow_share():
+    """Phase 3: outcome_quality_fraction (when supplied) narrows proven-agent discount."""
+    from agentctrl import RiskEngine, ActionProposal
+
+    engine = RiskEngine()
+
+    strong_allow = ActionProposal(
+        agent_id="a1", action_type="search", action_params={}, autonomy_level=2,
+        trust_context={
+            "total_actions": 60,
+            "success_rate": 0.98,
+            "trust_balance": 98.0,
+            "calibration_accuracy": 1.0,
+        },
+    )
+    weak_outcome = ActionProposal(
+        agent_id="a1", action_type="search", action_params={}, autonomy_level=2,
+        trust_context={
+            "total_actions": 60,
+            "success_rate": 0.98,
+            "trust_balance": 98.0,
+            "calibration_accuracy": 1.0,
+            "outcome_quality_fraction": 0.71,
+        },
+    )
+
+    s1 = await engine.score(strong_allow)
+    s2 = await engine.score(weak_outcome)
+
+    def _tc(score):
+        for f in score.factors:
+            if f.get("factor") == "trust_calibration":
+                return f["contribution"]
+        return None
+
+    assert _tc(s1) is not None and _tc(s1) < 0
+    assert _tc(s2) is not None and _tc(s2) < 0
+    assert abs(_tc(s2)) < abs(_tc(s1))
+
+
+@pytest.mark.asyncio
 async def test_calibration_accuracy_scales_surcharge():
     """Lower calibration_accuracy → smaller new-agent surcharge."""
     from agentctrl import RiskEngine, ActionProposal

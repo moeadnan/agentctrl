@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pr
 
 ---
 
+## [0.3.2] — 2026-05-01
+
+### Changed — RiskEngine trust calibration (`outcome_quality_fraction`)
+
+When `trust_context["outcome_quality_fraction"]` or
+`trust_context["action_trust"]["outcome_quality_fraction"]` is supplied,
+`RiskEngine` uses it instead of governance ALLOW-share `success_rate`
+for the proven-agent discount branch (`> 70 %` maturity gate).
+
+Callers omitting these keys behave exactly as before (backward-compatible).
+
+### Added — `ActionProposal.trust_context` documentation
+
+`types.ActionProposal` docstring now lists optional `outcome_quality_fraction`
+and nested `action_trust` fields aligned with `RiskEngine` behavior.
+
+---
+
 ## [0.3.1] — 2026-05-01
 
 ### Changed — Provider matrix narrowed

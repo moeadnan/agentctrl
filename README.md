@@ -76,7 +76,7 @@ Those are institutional controls. They existed for human employees. They need to
 - **Fail-closed.** Any pipeline error produces BLOCK, never silent approval.
 - **Structural enforcement.** Policies are operator-based rule matching, not prompt instructions. Authority is graph traversal. Risk is weighted factor scoring. None of this is prompt engineering.
 
-> **Status:** 89 tests (88 pass, 1 skipped when `networkx` not installed). Published on [PyPI](https://pypi.org/project/agentctrl/).
+> **Status:** 90 tests (89 pass, 1 skipped when `networkx` not installed). Published on [PyPI](https://pypi.org/project/agentctrl/).
 
 ---
 
@@ -322,7 +322,7 @@ Authority is opt-in. When no graph is configured, the authority check passes. Co
 
 ### Risk Scoring
 
-Deterministic factor-based scoring across 13 dimensions: base action risk, high-value transaction, novel vendor, off-hours activity, data sensitivity, rate pressure, velocity, behavioral anomaly, cumulative exposure, input confidence, trust calibration (new agents face surcharge that decays to zero at maturity, proven agents earn up to 15% reduction scaled by prediction accuracy), factor interaction (3+ concurrent factors trigger compounding), and consequence class floors (irreversible actions never score LOW).
+Deterministic factor-based scoring across 13 dimensions: base action risk, high-value transaction, novel vendor, off-hours activity, data sensitivity, rate pressure, velocity, behavioral anomaly, cumulative exposure, input confidence, trust calibration (new agents face surcharge that decays to zero at maturity, proven agents earn up to 15% reduction scaled by **`outcome_quality_fraction` when supplied** otherwise governance ALLOW-share **`success_rate`**, scaled by prediction accuracy), factor interaction (3+ concurrent factors trigger compounding), and consequence class floors (irreversible actions never score LOW).
 
 ### Conflict Detection
 
@@ -375,7 +375,7 @@ from agentctrl import (
     register_hook,           # Subscribe to lifecycle events
     clear_hooks,             # Clear registered hooks
 
-    # Pluggable rate-limit backend (0.3.0+) — cluster-safe consumers
+    # Pluggable rate-limit backend — cluster-safe consumers
     # inject their own backend; in-memory default keeps single-process
     # use and tests working unchanged.
     RateLimitBackend,        # Protocol — consumer implements Redis/etc.
@@ -421,7 +421,7 @@ result = await gateway.validate(proposal)
 python -m pytest tests/ -v
 ```
 
-89 tests (88 pass, 1 skipped when `networkx` not installed) covering: pipeline stages, advisory context, fail-closed behavior, policy evaluation (AND/OR groups, 14 operators, temporal conditions), authority graph (delegation, SoD, limits, decay), risk scoring (13 dimensions, trust calibration with accuracy scaling and action-type override, consequence class), conflict detection, `@governed` decorator, CLI, demo, audit logging, subscriptable record, empty authority default, instance isolation, library boundary, and pluggable rate-limit backend (protocol conformance, in-memory counter, fail-safe BLOCK on backend unreachable).
+90 tests (89 pass, 1 skipped when `networkx` not installed) covering: pipeline stages, advisory context, fail-closed behavior, policy evaluation (AND/OR groups, 14 operators, temporal conditions), authority graph (delegation, SoD, limits, decay), risk scoring (13 dimensions, trust calibration with accuracy scaling and action-type override, consequence class), conflict detection, `@governed` decorator, CLI, demo, audit logging, subscriptable record, empty authority default, instance isolation, library boundary, and pluggable rate-limit backend (protocol conformance, in-memory counter, fail-safe BLOCK on backend unreachable).
 
 ## Requirements
 
